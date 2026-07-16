@@ -19,7 +19,7 @@ async function sb(view, params = "") {
 // ══════════════════════════════════════════════════════════════════════════════
 // CONSTANTS & UTILITIES
 // ══════════════════════════════════════════════════════════════════════════════
-const CC = { "DM":"#7c3aed","CRM":"#059669","Platform":"#0ea5e9","Share":"#f59e0b","Social Media Team":"#db2777","SEO":"#84cc16","Update":"#6366f1","Referral":"#14b8a6","Others":"#f43f5e","Null":"#94a3b8","Total":"#0f172a" };
+const CC = { "DM":"#7c3aed","CRM":"#059669","Platform":"#0ea5e9","Share":"#f59e0b","Social Media Team":"#db2777","SEO":"#84cc16","Update":"#6366f1","Referral":"#14b8a6","Others":"#f43f5e","Null":"#94a3b8","Total":"#0f172a","All":"#0f172a" };
 const chColor = ch => CC[ch] || "#94a3b8";
 const OT_LABELS = { "All":"All Orders","normal_order":"Normal Order","main_order":"Main Order" };
 
@@ -91,8 +91,12 @@ function Kpi({ label, value, cur, prev, a3, a6, aAll }){
 }
 
 // builds the 4 KPI values + comparison bases for a given month index
+// "All"/"Total" = every non-tel channel summed (Null, DM, CRM, Platform, Share,
+// Update, Social Media Team, SEO, Referral, Others)
+const isAggCh = ch => ch==="All" || ch==="Total";
+
 function monthKpis(D, ch, idx){
-  const get=(i)=> ch==="Total" ? D.monthTotals[i] : D.chMo[i]?.[ch];
+  const get=(i)=> isAggCh(ch) ? D.monthTotals[i] : D.chMo[i]?.[ch];
   const r=get(idx)||{orders:0,amount:0,brand_new:0};
   const idxList=D.months.map(w=>w.idx);
   const win=(n)=> idxList.filter(i=> i<idx && i>=idx-n);
@@ -134,7 +138,7 @@ function ScoreCard({ D, ch, idx, variant }){
 }
 
 function ScorecardTab({ D }){
-  const channels=D.mainChs;
+  const channels=["All",...D.mainChs];
   const [ch,setCh]=useState(channels[0]);
   const lastIdx=D.lastIdx;
   const prevIdx=lastIdx-1;
@@ -147,7 +151,7 @@ function ScorecardTab({ D }){
 
   // 12-month trend (or all available)
   const trend=D.months.slice(-12).map(w=>{
-    const c= ch==="Total"?D.monthTotals[w.idx]:D.chMo[w.idx]?.[ch];
+    const c= isAggCh(ch)?D.monthTotals[w.idx]:D.chMo[w.idx]?.[ch];
     return { m:w.label, donation:c?Math.round(+c.amount/1000):0, orders:c?c.orders:0, brand:c?c.brand_new:0 };
   });
 
@@ -720,6 +724,9 @@ function buildModel(raw){
   sourceMo.forEach(r=>{
     const key=r.utm_source+" ||| "+r.utm_medium;
     (((srcIdx[r.channel] ||= {})[key] ||= {}))[r.month_idx] = { orders:r.orders, amount:+r.amount, new_sip:r.new_sip, repeat_sip:r.repeat_sip, source:r.utm_source, medium:r.utm_medium };
+    // "All" = same source/medium rolled up across every channel
+    const a=((((srcIdx["All"] ||= {})[key] ||= {}))[r.month_idx] ||= { orders:0, amount:0, new_sip:0, repeat_sip:0, source:r.utm_source, medium:r.utm_medium });
+    a.orders+=r.orders; a.amount+=+r.amount; a.new_sip+=r.new_sip; a.repeat_sip+=r.repeat_sip;
   });
   const srcBench={};
   Object.keys(srcIdx).forEach(ch=>{
